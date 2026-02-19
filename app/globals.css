@@ -1,26 +1,206 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #050508;
+  --foreground: #e8eaf6;
+  --teal: #0CCEC0;
+  --teal-glow: rgba(12, 206, 192, 0.15);
+  --teal-dim: rgba(12, 206, 192, 0.08);
+  --void: #050508;
+  --cold-1: #0d0d18;
+  --cold-2: #111122;
+  --cold-3: #1a1a35;
+  --text-muted: rgba(200, 210, 230, 0.5);
+  --text-subtle: rgba(200, 210, 230, 0.25);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--void);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cold-3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--teal);
+}
+
+/* Blinking cursor animation */
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+.cursor-blink {
+  animation: blink 1s ease-in-out infinite;
+}
+
+/* Noise texture overlay */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* Glow utilities */
+.teal-glow {
+  box-shadow: 0 0 30px rgba(12, 206, 192, 0.2), 0 0 60px rgba(12, 206, 192, 0.08);
+}
+
+.teal-text-glow {
+  text-shadow: 0 0 40px rgba(12, 206, 192, 0.4), 0 0 80px rgba(12, 206, 192, 0.15);
+}
+
+/* Button glow */
+.btn-teal-glow:hover {
+  box-shadow: 0 0 20px rgba(12, 206, 192, 0.3), 0 0 40px rgba(12, 206, 192, 0.1);
+}
+
+.btn-ghost-glow:hover {
+  box-shadow: 0 0 20px rgba(12, 206, 192, 0.1), inset 0 0 20px rgba(12, 206, 192, 0.05);
+}
+
+/* Gradient text */
+.gradient-text-cold {
+  background: linear-gradient(135deg, #e8eaf6 0%, #b0b8d4 50%, #7a8aaf 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Ambient orbs */
+.orb {
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+/* Nav border shimmer */
+.nav-border {
+  border-bottom: 1px solid rgba(12, 206, 192, 0.08);
+}
+
+/* Feature card hover */
+.feature-card {
+  transition: all 0.3s ease;
+  border: 1px solid rgba(12, 206, 192, 0.06);
+}
+
+.feature-card:hover {
+  border-color: rgba(12, 206, 192, 0.2);
+  background: rgba(12, 206, 192, 0.04);
+  transform: translateY(-2px);
+}
+
+/* Badge pulse */
+@keyframes pulse-teal {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(12, 206, 192, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(12, 206, 192, 0);
+  }
+}
+
+.badge-pulse {
+  animation: pulse-teal 2s ease-in-out infinite;
+}
+
+/* Shimmer animation for buttons */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  transform: translateX(-100%);
+}
+
+.shimmer-btn:hover::after {
+  animation: shimmer 0.6s ease-out;
+}
+
+/* Floating animation */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.float-animation {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Scan line effect */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+
+  100% {
+    transform: translateY(100vh);
+  }
 }
