@@ -1,0 +1,45 @@
+# .cursorrules
+
+This is the NicheVibe project - an AI-powered anime discovery platform.
+
+CRITICAL REFERENCES:
+- Read PRD.md for ALL product requirements, API specs, and database schema
+- Read FOLDER_STRUCTURE.md for project organization
+- Follow the Teal & Void color palette defined in PRD section 4.2
+
+TECH STACK (from PRD):
+- Next.js 14 App Router
+- TypeScript
+- Tailwind CSS (custom void/teal/cold colors)
+- Framer Motion for animations
+- Supabase (PostgreSQL + pgvector)
+- Google AI text-embedding-004 (768 dimensions)
+
+COLOR PALETTE (NO purple/violet/indigo EVER):
+- Background: #050508 (void-950), #0D0D12 (void-900), #13131A (void-800)
+- Accent: #0CCEC0 (teal) - ONLY primary accent
+- Text: #E8F4F8 (cold-100), #6B7E8A (cold-400)
+- Success: #22C55E (green)
+- Danger: #EF4444 (red)
+
+DEVELOPMENT RULES:
+1. ALWAYS check PRD.md before building any feature
+2. API responses MUST match PRD section 7 (API Specifications)
+3. Database schema MUST match PRD section 6 (Database Schema)
+4. ALL colors MUST use void/teal/cold palette - NO purple/violet
+5. Use config/discovery.ts for ALL tunable thresholds
+6. Framer Motion for ALL animations
+7. All API routes follow Next.js 14 App Router patterns
+8. TypeScript strict mode enabled
+
+BEFORE implementing any feature:
+1. Reference the relevant PRD section
+2. Check if there's a config file for the feature
+3. Verify color palette compliance
+4. Ensure database schema alignment
+
+When I ask you to build something, ALWAYS:
+- Reference the PRD section first
+- Confirm you understand the spec
+- Ask clarifying questions if the PRD is unclear
+- Build according to PRD specifications exactly
