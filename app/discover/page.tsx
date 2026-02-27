@@ -1,7 +1,7 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useMemo, useState } from 'react';
 import Navbar from '../components/Navbar';
 
 /* ─── Anime data ─── */
@@ -15,7 +15,6 @@ const ANIME_LIST = [
     tags: ['Cyberpunk', 'Existential', 'Surreal'],
     color: '#1a0a2e',
     accent: '#7c3aed',
-    // gradient poster placeholder
     poster: null,
   },
   {
@@ -120,19 +119,23 @@ const ANIME_LIST = [
 ];
 
 /* ─── Anime Card ─── */
-function AnimeCard({ anime, index, featured }: {
-  anime: typeof ANIME_LIST[0];
+function AnimeCard({
+  anime,
+  index,
+  featured,
+}: {
+  anime: (typeof ANIME_LIST)[0];
   index: number;
   featured?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
-  const cardH = featured ? 340 : 280;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
+      className={`nv-card${featured ? ' nv-card--featured' : ''}`}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: index * 0.06, ease: 'easeOut' }}
+      transition={{ duration: 0.4, delay: index * 0.05, ease: 'easeOut' }}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
       style={{
@@ -140,95 +143,144 @@ function AnimeCard({ anime, index, featured }: {
         borderRadius: 10,
         overflow: 'hidden',
         cursor: 'pointer',
-        flexShrink: 0,
-        width: featured ? 220 : 180,
-        height: cardH,
-        border: `1px solid ${hovered ? anime.accent + '50' : 'rgba(200,210,230,0.07)'}`,
-        transition: 'border-color 0.25s ease, transform 0.25s ease',
-        transform: hovered ? 'translateY(-6px) scale(1.02)' : 'translateY(0) scale(1)',
-        /* Full card background */
+        border: `1px solid ${hovered ? anime.accent + '55' : 'rgba(200,210,230,0.07)'}`,
+        transition: 'border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease',
+        transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
+        boxShadow: hovered ? `0 8px 32px ${anime.accent}22` : 'none',
         background: `linear-gradient(160deg, ${anime.color} 0%, #080810 100%)`,
       }}
     >
-      {/* Ambient glow blobs */}
-      <div style={{
-        position: 'absolute', bottom: -30, right: -30,
-        width: 140, height: 140, borderRadius: '50%',
-        background: anime.accent, opacity: hovered ? 0.2 : 0.1,
-        filter: 'blur(40px)', transition: 'opacity 0.3s ease',
-        pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', top: -10, left: -10,
-        width: 80, height: 80, borderRadius: '50%',
-        background: anime.accent, opacity: hovered ? 0.12 : 0.06,
-        filter: 'blur(25px)', transition: 'opacity 0.3s ease',
-        pointerEvents: 'none',
-      }} />
+      {/* Ambient glow — bottom right */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: -30,
+          right: -30,
+          width: 140,
+          height: 140,
+          borderRadius: '50%',
+          background: anime.accent,
+          opacity: hovered ? 0.22 : 0.1,
+          filter: 'blur(40px)',
+          transition: 'opacity 0.3s ease',
+          pointerEvents: 'none',
+        }}
+      />
+      {/* Ambient glow — top left */}
+      <div
+        style={{
+          position: 'absolute',
+          top: -10,
+          left: -10,
+          width: 80,
+          height: 80,
+          borderRadius: '50%',
+          background: anime.accent,
+          opacity: hovered ? 0.13 : 0.06,
+          filter: 'blur(25px)',
+          transition: 'opacity 0.3s ease',
+          pointerEvents: 'none',
+        }}
+      />
 
-      {/* Genre badge top-left */}
-      <div style={{
-        position: 'absolute', top: 12, left: 12, zIndex: 2,
-        padding: '4px 10px', borderRadius: 4,
-        background: 'rgba(5,5,8,0.75)',
-        border: `1px solid ${anime.accent}45`,
-        fontSize: 9, fontWeight: 700,
-        color: anime.accent, letterSpacing: '0.12em',
-        fontFamily: "'Space Grotesk', monospace",
-        textTransform: 'uppercase',
-        backdropFilter: 'blur(6px)',
-      }}>
+      {/* Genre badge */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 12,
+          left: 12,
+          zIndex: 2,
+          padding: '4px 10px',
+          borderRadius: 4,
+          background: 'rgba(5,5,8,0.8)',
+          border: `1px solid ${anime.accent}45`,
+          fontSize: 9,
+          fontWeight: 700,
+          color: anime.accent,
+          letterSpacing: '0.12em',
+          fontFamily: "'Space Grotesk', monospace",
+          textTransform: 'uppercase',
+          backdropFilter: 'blur(6px)',
+        }}
+      >
         {anime.genre}
       </div>
 
       {/* Bottom scrim + info */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 2,
-        background: 'linear-gradient(to top, rgba(5,5,8,0.95) 0%, rgba(5,5,8,0.5) 60%, transparent 100%)',
-        padding: '40px 14px 16px',
-      }}>
-        {/* Tags on hover */}
-        <AnimatePresence>
-          {hovered && (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6 }}
-              transition={{ duration: 0.18 }}
-              style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}
-            >
-              {anime.tags.slice(0, 2).map((tag) => (
-                <span key={tag} style={{
-                  fontSize: 8, fontWeight: 700, letterSpacing: '0.1em',
-                  padding: '2px 7px', borderRadius: 3,
-                  background: `${anime.accent}20`,
-                  border: `1px solid ${anime.accent}35`,
-                  color: anime.accent,
-                  textTransform: 'uppercase',
-                  fontFamily: "'Space Grotesk', monospace",
-                }}>{tag}</span>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 2,
+          background:
+            'linear-gradient(to top, rgba(5,5,8,0.97) 0%, rgba(5,5,8,0.55) 60%, transparent 100%)',
+          padding: '44px 12px 14px',
+        }}
+      >
+        {/* Tags — always visible on mobile, hover-revealed on desktop */}
+        <div className="nv-tags-wrap" style={{ marginBottom: 8 }}>
+          <AnimatePresence>
+            {hovered && (
+              <motion.div
+                className="nv-tags-hover"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.18 }}
+                style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}
+              >
+                {anime.tags.slice(0, 2).map((tag) => (
+                  <TagPill key={tag} tag={tag} accent={anime.accent} />
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        <h3 style={{
-          fontSize: 13, fontWeight: 700, color: '#e8eaf6',
-          marginBottom: 4, lineHeight: 1.25,
-          fontFamily: "'Space Grotesk', sans-serif",
-          letterSpacing: '-0.01em',
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
+          {/* Always-visible on mobile */}
+          <div className="nv-tags-mobile" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {anime.tags.slice(0, 2).map((tag) => (
+              <TagPill key={tag} tag={tag} accent={anime.accent} />
+            ))}
+          </div>
+        </div>
+
+        <h3
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: '#e8eaf6',
+            marginBottom: 5,
+            lineHeight: 1.3,
+            fontFamily: "'Space Grotesk', sans-serif",
+            letterSpacing: '-0.01em',
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+          }}
+        >
           {anime.title}
         </h3>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, color: 'rgba(200,210,230,0.35)', fontWeight: 400 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span
+            style={{ fontSize: 11, color: 'rgba(200,210,230,0.35)', fontWeight: 400 }}
+          >
             {anime.year}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
             <span style={{ fontSize: 11, color: '#0CCEC0' }}>★</span>
-            <span style={{ fontSize: 11, color: '#0CCEC0', fontWeight: 600 }}>{anime.rating}</span>
+            <span style={{ fontSize: 11, color: '#0CCEC0', fontWeight: 600 }}>
+              {anime.rating}
+            </span>
           </div>
         </div>
       </div>
@@ -236,7 +288,29 @@ function AnimeCard({ anime, index, featured }: {
   );
 }
 
-/* ─── Grid pattern ─── */
+function TagPill({ tag, accent }: { tag: string; accent: string }) {
+  return (
+    <span
+      style={{
+        fontSize: 8,
+        fontWeight: 700,
+        letterSpacing: '0.1em',
+        padding: '2px 7px',
+        borderRadius: 3,
+        background: `${accent}20`,
+        border: `1px solid ${accent}35`,
+        color: accent,
+        textTransform: 'uppercase',
+        fontFamily: "'Space Grotesk', monospace",
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {tag}
+    </span>
+  );
+}
+
+/* ─── Grid overlay ─── */
 function GridOverlay() {
   return (
     <div
@@ -268,7 +342,7 @@ export default function DiscoverPage() {
       (a) =>
         a.title.toLowerCase().includes(q) ||
         a.genre.toLowerCase().includes(q) ||
-        a.tags.some((t) => t.toLowerCase().includes(q))
+        a.tags.some((t) => t.toLowerCase().includes(q)),
     );
   }, [query]);
 
@@ -278,32 +352,36 @@ export default function DiscoverPage() {
       <Navbar active="discover" />
 
       <div style={{ paddingTop: 64, position: 'relative', zIndex: 10 }}>
-        <div style={{ maxWidth: 1100, marginInline: 'auto', padding: '56px 40px 80px' }}>
+        <div className="nv-discover-container">
 
           {/* Page heading */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            style={{ marginBottom: 36 }}
+            style={{ marginBottom: 28 }}
           >
-            <h1 style={{
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: 'clamp(2.4rem, 5vw, 3.5rem)',
-              fontWeight: 800,
-              color: '#e8eaf6',
-              letterSpacing: '-0.04em',
-              lineHeight: 1.05,
-              marginBottom: 12,
-            }}>
+            <h1
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: 'clamp(2rem, 6vw, 3.5rem)',
+                fontWeight: 800,
+                color: '#e8eaf6',
+                letterSpacing: '-0.04em',
+                lineHeight: 1.05,
+                marginBottom: 10,
+              }}
+            >
               Discover
             </h1>
-            <p style={{
-              fontSize: 14,
-              color: 'rgba(200,210,230,0.4)',
-              lineHeight: 1.6,
-              maxWidth: 460,
-            }}>
+            <p
+              style={{
+                fontSize: 14,
+                color: 'rgba(200,210,230,0.4)',
+                lineHeight: 1.6,
+                maxWidth: 460,
+              }}
+            >
               Search through the archives of the void. Find exactly what you&apos;re looking for.
             </p>
           </motion.div>
@@ -313,25 +391,27 @@ export default function DiscoverPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
+            className="nv-search-bar"
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 0,
               background: 'rgba(255,255,255,0.04)',
               border: `1px solid ${focused ? 'rgba(12,206,192,0.35)' : 'rgba(200,210,230,0.12)'}`,
               borderRadius: 10,
-              padding: '0 16px',
-              marginBottom: 56,
-              maxWidth: 460,
+              padding: '0 14px',
+              marginBottom: 40,
               transition: 'border-color 0.2s ease',
             }}
           >
-            {/* Search icon */}
             <svg
-              width="16" height="16"
-              viewBox="0 0 24 24" fill="none"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
               stroke="rgba(200,210,230,0.35)"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
               style={{ flexShrink: 0 }}
             >
               <circle cx="11" cy="11" r="8" />
@@ -352,13 +432,13 @@ export default function DiscoverPage() {
                 outline: 'none',
                 color: '#e8eaf6',
                 fontSize: 14,
-                padding: '14px 12px',
+                padding: '13px 12px',
                 fontFamily: "'Inter', sans-serif",
                 caretColor: '#0CCEC0',
+                minWidth: 0,
               }}
             />
 
-            {/* Filter icon */}
             <button
               onClick={() => setFilterOpen(!filterOpen)}
               style={{
@@ -373,7 +453,16 @@ export default function DiscoverPage() {
                 flexShrink: 0,
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
               </svg>
             </button>
@@ -387,7 +476,7 @@ export default function DiscoverPage() {
               style={{
                 fontSize: 12,
                 color: 'rgba(200,210,230,0.35)',
-                marginBottom: 24,
+                marginBottom: 20,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
                 fontFamily: "'Space Grotesk', monospace",
@@ -397,22 +486,15 @@ export default function DiscoverPage() {
             </motion.div>
           )}
 
-          {/* Anime cards — horizontal scroll on mobile, wrap on desktop */}
+          {/* Card grid */}
           <AnimatePresence mode="wait">
             {filtered.length > 0 ? (
               <motion.div
                 key="results"
+                className="nv-card-grid"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                style={{
-                  display: 'flex',
-                  gap: 16,
-                  overflowX: 'auto',
-                  paddingBottom: 16,
-                  flexWrap: 'wrap',
-                  scrollbarWidth: 'none',
-                }}
               >
                 {filtered.map((anime, i) => (
                   <AnimeCard
@@ -436,28 +518,110 @@ export default function DiscoverPage() {
                 }}
               >
                 <div style={{ fontSize: 32, marginBottom: 16 }}>◎</div>
-                <div style={{ fontSize: 14, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                  }}
+                >
                   No signal found in the void
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Bottom tagline */}
-          <div style={{
-            marginTop: 80,
-            textAlign: 'center',
-            fontSize: 11,
-            color: 'rgba(200,210,230,0.15)',
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            fontFamily: "'Space Grotesk', monospace",
-          }}>
+          {/* Footer tagline */}
+          <div
+            style={{
+              marginTop: 64,
+              textAlign: 'center',
+              fontSize: 11,
+              color: 'rgba(200,210,230,0.15)',
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              fontFamily: "'Space Grotesk', monospace",
+            }}
+          >
             THE VOID HAS {ANIME_LIST.length} SIGNALS INDEXED
           </div>
-
         </div>
       </div>
+
+      {/* ─── Responsive styles ─── */}
+      <style>{`
+        /* ── Page container ── */
+        .nv-discover-container {
+          max-width: 1100px;
+          margin-inline: auto;
+          padding: 48px 40px 80px;
+        }
+
+        /* ── Search bar ── */
+        .nv-search-bar {
+          max-width: 460px;
+        }
+
+        /* ── Card grid: auto-fill wrap on desktop ── */
+        .nv-card-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+          gap: 16px;
+        }
+
+        /* ── Card: height and sizing ── */
+        .nv-card {
+          height: 280px;
+          width: 100%;
+        }
+        .nv-card--featured {
+          height: 320px;
+        }
+
+        /* ── Tags: desktop = hover only, mobile = always visible ── */
+        .nv-tags-hover  { display: flex; }
+        .nv-tags-mobile { display: none; }
+
+        /* ══════════════════════════════════════
+           MOBILE  ≤ 640px
+        ══════════════════════════════════════ */
+        @media (max-width: 640px) {
+          .nv-discover-container {
+            padding: 28px 16px 64px;
+          }
+
+          .nv-search-bar {
+            max-width: 100%;
+            margin-bottom: 28px;
+          }
+
+          /* 2-column grid, equal heights */
+          .nv-card-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+          }
+
+          /* Taller cards so content fits in portrait */
+          .nv-card {
+            height: 240px;
+          }
+          .nv-card--featured {
+            height: 260px;
+          }
+
+          /* Tags always visible on touch — hide hover version */
+          .nv-tags-hover  { display: none !important; }
+          .nv-tags-mobile { display: flex; }
+        }
+
+        /* ══════════════════════════════════════
+           SMALL MOBILE  ≤ 380px
+        ══════════════════════════════════════ */
+        @media (max-width: 380px) {
+          .nv-card     { height: 210px; }
+          .nv-card--featured { height: 230px; }
+        }
+      `}</style>
     </div>
   );
 }
