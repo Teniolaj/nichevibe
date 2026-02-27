@@ -87,20 +87,22 @@ export default function Navbar({ active }: { active?: 'discover' | 'explore' | '
         </div>
 
         {/* Desktop sign up */}
-        <motion.button
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
-          className="hidden-mobile"
-          style={{
-            padding: '8px 24px', borderRadius: 8,
-            background: '#0CCEC0', border: '1px solid #0CCEC0',
-            color: '#050508', fontSize: 13, fontWeight: 700,
-            cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
-            letterSpacing: '0.04em',
-          }}
-        >
-          SIGN UP
-        </motion.button>
+        <Link href="/signup" className="hidden-mobile" style={{ textDecoration: 'none' }}>
+          <motion.span
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            style={{
+              display: 'inline-block',
+              padding: '8px 24px', borderRadius: 8,
+              background: '#0CCEC0', border: '1px solid #0CCEC0',
+              color: '#050508', fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: '0.04em',
+            }}
+          >
+            SIGN UP
+          </motion.span>
+        </Link>
 
         {/* Hamburger (mobile only) */}
         <button
@@ -202,27 +204,30 @@ export default function Navbar({ active }: { active?: 'discover' | 'explore' | '
             </nav>
 
             {/* Sign up */}
-            <motion.button
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35, duration: 0.3 }}
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.96 }}
-              style={{
-                padding: '14px 48px',
-                borderRadius: 10,
-                background: '#0CCEC0',
-                border: '1px solid #0CCEC0',
-                color: '#050508',
-                fontSize: 16, fontWeight: 800,
-                cursor: 'pointer',
-                fontFamily: "'Space Grotesk', sans-serif",
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-              }}
-            >
-              SIGN UP
-            </motion.button>
+            <Link href="/signup" onClick={() => setMenuOpen(false)} style={{ textDecoration: 'none' }}>
+              <motion.span
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35, duration: 0.3 }}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                style={{
+                  display: 'inline-block',
+                  padding: '14px 48px',
+                  borderRadius: 10,
+                  background: '#0CCEC0',
+                  border: '1px solid #0CCEC0',
+                  color: '#050508',
+                  fontSize: 16, fontWeight: 800,
+                  cursor: 'pointer',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                SIGN UP
+              </motion.span>
+            </Link>
           </motion.div>
         )}
       </AnimatePresence>
