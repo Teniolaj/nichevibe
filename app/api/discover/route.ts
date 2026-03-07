@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { rateLimit, rateLimitPresets } from '@/lib/rate-limit';
+import { DiscoverSchema, parseOr400 } from '@/lib/schemas';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -105,27 +106,9 @@ export async function POST(request: Request) {
       return json({ success: false, error: 'Invalid JSON body', code: 'INVALID_INPUT' }, 400);
     }
 
-    const {
-      query,
-      anilist_id,
-      match_count = 20,
-      max_popularity = 1000000,
-      min_score = 7.0,
-    } = body as {
-      query?: string;
-      anilist_id?: number;
-      match_count?: number;
-      max_popularity?: number;
-      min_score?: number;
-    };
-
-    if (!query && !anilist_id) {
-      return json({
-        success: false,
-        error: 'Provide either "query" (anime title) or "anilist_id"',
-        code: 'INVALID_INPUT',
-      }, 400);
-    }
+    const parsed = parseOr400(DiscoverSchema, body, json);
+    if (!parsed.success) return parsed.response;
+    const { query, anilist_id, match_count, max_popularity, min_score } = parsed.data;
 
     // ── Step 1: Resolve the seed embedding ──────────────────────────────────
 

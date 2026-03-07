@@ -1,12 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { rateLimit, rateLimitPresets } from '@/lib/rate-limit';
+import { EmbedSchema, parseOr400 } from '@/lib/schemas';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 const EMBEDDING_MODEL = 'gemini-embedding-001';
 const EMBEDDING_DIMENSIONS = 3072;
-const MAX_INPUT_LENGTH = 8000;
 
 function json(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status });
@@ -48,21 +48,13 @@ export async function POST(request: Request) {
     if (limited) return limited;
 
     const body = await request.json().catch(() => null);
-    if (!body || typeof body.text !== 'string') {
-      return json({ success: false, error: 'Request body must include a "text" field (string)', code: 'INVALID_INPUT' }, 400);
+    if (!body) {
+      return json({ success: false, error: 'Invalid JSON body', code: 'INVALID_INPUT' }, 400);
     }
 
-    const text = body.text.trim();
-    if (text.length === 0) {
-      return json({ success: false, error: 'Text must not be empty', code: 'INVALID_INPUT' }, 400);
-    }
-    if (text.length > MAX_INPUT_LENGTH) {
-      return json({
-        success: false,
-        error: `Text exceeds maximum length of ${MAX_INPUT_LENGTH} characters`,
-        code: 'INPUT_TOO_LONG',
-      }, 400);
-    }
+    const parsed = parseOr400(EmbedSchema, body, json);
+    if (!parsed.success) return parsed.response;
+    const { text } = parsed.data;
 
     const apiKey = process.env.GOOGLE_AI_API_KEY;
     if (!apiKey) {

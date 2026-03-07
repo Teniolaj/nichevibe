@@ -1,10 +1,22 @@
 'use client';
 
+import { OnboardingModal, hasOnboardingCompleted } from '../components/OnboardingModal';
 import { AnimatePresence, motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '../components/Navbar';
+import { AnimeCoverImage } from '../components/AnimeCoverImage';
+import { createClient } from '@/lib/supabase/client';
 
 /* ─── Types ─── */
+interface AutocompleteResult {
+  id: number;
+  anilist_id: number;
+  title: string;
+  title_english: string | null;
+  cover_image: string | null;
+}
+
 interface AnimeResult {
   id: number;
   anilist_id: number;
@@ -29,6 +41,51 @@ interface DiscoverResponse {
 }
 
 type ViewMode = 'grid' | 'swipe';
+
+/* ─── Library grid types (logged-in) ─── */
+type PopularityTag = 'unpopular' | 'a_little_bit_popular' | 'popular';
+
+interface LibraryAnimeInfo {
+  id: number;
+  anilist_id?: number;
+  title: string;
+  title_english?: string | null;
+  cover_image?: string | null;
+  total_episodes?: number | null;
+  genres?: string[];
+  average_score?: number | null;
+  popularity_rank?: number | null;
+}
+
+interface LibraryGridItem {
+  id: number;
+  anime_id: number;
+  anime: LibraryAnimeInfo;
+  popularityTag: PopularityTag;
+}
+
+/**
+ * AniList stores "popularity" as raw user count (higher = more popular).
+ * We map: popular (high count), a_little_bit_popular (medium), unpopular (low count).
+ */
+function getPopularityTag(popularityCount: number | null | undefined): PopularityTag {
+  if (popularityCount == null || popularityCount <= 0) return 'a_little_bit_popular';
+  if (popularityCount >= 200000) return 'popular';
+  if (popularityCount >= 50000) return 'a_little_bit_popular';
+  return 'unpopular';
+}
+
+const POPULARITY_TAG_LABELS: Record<PopularityTag, string> = {
+  unpopular: 'Unpopular',
+  a_little_bit_popular: 'A little bit popular',
+  popular: 'Popular',
+};
+
+const POPULARITY_TAG_COLORS: Record<PopularityTag, string> = {
+  unpopular: '#6366f1',
+  a_little_bit_popular: '#f59e0b',
+  popular: '#10b981',
+};
 
 /* ─── Genre → accent color ─── */
 const GENRE_COLORS: Record<string, string> = {
@@ -93,14 +150,14 @@ function SwipeCard({
     >
       {/* Cover image */}
       {anime.cover_image && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={anime.cover_image} alt={displayTitle}
-          style={{
-            position: 'absolute', inset: 0, width: '100%', height: '100%',
-            objectFit: 'cover', opacity: 0.4, pointerEvents: 'none',
-          }}
-        />
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          <AnimeCoverImage
+            src={anime.cover_image}
+            alt={displayTitle}
+            fill
+            style={{ opacity: 0.4, pointerEvents: 'none' }}
+          />
+        </div>
       )}
 
       {/* Swipe direction overlays */}
@@ -264,7 +321,9 @@ function SwipeCardStack({
     >
       {/* Close button */}
       <button
+        type="button"
         onClick={onClose}
+        aria-label="Close swipe modal"
         style={{
           position: 'absolute', top: 20, right: 24, zIndex: 110,
           background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(200,210,230,0.1)',
@@ -408,10 +467,138 @@ function SwipeCardStack({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   DETAIL MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function AnimeDetailModal({
+  anime,
+  onClose,
+  onAddToLibrary,
+}: {
+  anime: AnimeResult;
+  onClose: () => void;
+  onAddToLibrary?: () => void;
+}) {
+  const accent = getAccent(anime.genres);
+  const displayTitle = anime.title_english || anime.title;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="detail-modal-title"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(5,5,8,0.9)', backdropFilter: 'blur(12px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: 420, maxHeight: '90vh', overflowY: 'auto',
+          background: '#0d0d18', borderRadius: 12, border: '1px solid rgba(200,210,230,0.1)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+        }}
+      >
+        <div style={{ position: 'relative', height: 220, background: '#0a0a12' }}>
+          {anime.cover_image && (
+            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+              <AnimeCoverImage src={anime.cover_image} alt={displayTitle} fill style={{ opacity: 0.5 }} />
+            </div>
+          )}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            background: 'linear-gradient(to top, rgba(5,5,8,1) 0%, transparent 100%)', height: 100,
+          }} />
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              position: 'absolute', top: 12, right: 12, zIndex: 5,
+              background: 'rgba(5,5,8,0.8)', border: 'none', borderRadius: 8,
+              width: 36, height: 36, cursor: 'pointer', color: '#e8eaf6', fontSize: 18,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+        <div style={{ padding: 20 }}>
+          <h2 id="detail-modal-title" style={{
+            fontSize: 20, fontWeight: 800, color: '#e8eaf6', marginBottom: 12,
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}>
+            {displayTitle}
+          </h2>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+            {anime.genres.slice(0, 4).map((g) => (
+              <span key={g} style={{
+                fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 4,
+                background: `${accent}20`, border: `1px solid ${accent}40`, color: accent,
+                fontFamily: "'Space Grotesk', monospace", letterSpacing: '0.08em',
+              }}>{g}</span>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 13, color: 'rgba(200,210,230,0.6)' }}>
+            {anime.average_score && <span>★ {anime.average_score}</span>}
+            {anime.total_episodes && <span>{anime.total_episodes} ep</span>}
+            {anime.similarity && <span style={{ color: '#0CCEC0' }}>{Math.round(anime.similarity * 100)}% match</span>}
+          </div>
+          <p style={{
+            fontSize: 13, color: 'rgba(200,210,230,0.7)', lineHeight: 1.6, marginBottom: 16,
+            fontFamily: "'Inter', sans-serif",
+          }}>
+            {anime.synopsis || 'No synopsis available.'}
+          </p>
+          {anime.mood_tags.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
+              {anime.mood_tags.slice(0, 5).map((tag) => (
+                <span key={tag} style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', padding: '3px 8px',
+                  borderRadius: 4, background: `${accent}15`, border: `1px solid ${accent}30`,
+                  color: accent, fontFamily: "'Space Grotesk', monospace",
+                }}>{tag}</span>
+              ))}
+            </div>
+          )}
+          {onAddToLibrary && (
+            <button
+              type="button"
+              onClick={onAddToLibrary}
+              aria-label={`Add ${displayTitle} to library`}
+              style={{
+                width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: '#0CCEC0', color: '#050508', fontSize: 13, fontWeight: 700,
+                fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em',
+              }}
+            >
+              ADD TO LIBRARY
+            </button>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    GRID VIEW COMPONENTS
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function AnimeCard({ anime, index }: { anime: AnimeResult; index: number }) {
+function AnimeCard({ anime, index, onClick }: { anime: AnimeResult; index: number; onClick?: () => void }) {
   const [hovered, setHovered] = useState(false);
   const accent = getAccent(anime.genres);
   const displayTitle = anime.title_english || anime.title;
@@ -419,11 +606,16 @@ function AnimeCard({ anime, index }: { anime: AnimeResult; index: number }) {
   return (
     <motion.div
       className="nv-card"
+      role="button"
+      tabIndex={0}
+      aria-label={`View details for ${displayTitle}`}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(); } }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.05, ease: 'easeOut' }}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
+      onClick={onClick}
       style={{
         position: 'relative', borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
         border: `1px solid ${hovered ? accent + '55' : 'rgba(200,210,230,0.07)'}`,
@@ -434,14 +626,17 @@ function AnimeCard({ anime, index }: { anime: AnimeResult; index: number }) {
       }}
     >
       {anime.cover_image && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={anime.cover_image} alt={displayTitle}
-          style={{
-            position: 'absolute', inset: 0, width: '100%', height: '100%',
-            objectFit: 'cover', opacity: hovered ? 0.55 : 0.45, transition: 'opacity 0.3s ease',
-          }}
-        />
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          <AnimeCoverImage
+            src={anime.cover_image}
+            alt={displayTitle}
+            fill
+            style={{
+              opacity: hovered ? 0.55 : 0.45,
+              transition: 'opacity 0.3s ease',
+            }}
+          />
+        </div>
       )}
       {!anime.cover_image && (
         <>
@@ -539,13 +734,16 @@ function ViewToggle({ mode, onChange, mobileFirst }: { mode: ViewMode; onChange:
     : [['grid', 'Grid'], ['swipe', 'Swipe']];
 
   return (
-    <div style={{
+    <div role="group" aria-label="View mode" style={{
       display: 'flex', gap: 0, background: 'rgba(255,255,255,0.04)',
       borderRadius: 8, border: '1px solid rgba(200,210,230,0.08)', overflow: 'hidden',
     }}>
       {options.map(([val, label]) => (
         <button
           key={val}
+          type="button"
+          role="tab"
+          aria-selected={mode === val}
           onClick={() => onChange(val)}
           style={{
             padding: '6px 16px', border: 'none', cursor: 'pointer',
@@ -560,6 +758,105 @@ function ViewToggle({ mode, onChange, mobileFirst }: { mode: ViewMode; onChange:
         </button>
       ))}
     </div>
+  );
+}
+
+/* ─── Library grid (logged-in users) ─── */
+function LibraryGrid({
+  items,
+  onSelectAnime,
+}: {
+  items: LibraryGridItem[];
+  onSelectAnime?: (anilistId: number) => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      style={{ marginBottom: 40 }}
+    >
+      <h2 style={{
+        fontSize: 14, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
+        color: 'rgba(200,210,230,0.5)', marginBottom: 16, fontFamily: "'Space Grotesk', sans-serif",
+      }}>
+        From your library
+      </h2>
+      <div className="nv-library-grid">
+        {items.map((item, i) => {
+          const anime = item.anime;
+          const displayTitle = anime.title_english || anime.title;
+          const tagColor = POPULARITY_TAG_COLORS[item.popularityTag];
+          const anilistId = anime.anilist_id ?? anime.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-label={`View ${displayTitle} recommendations`}
+              onClick={() => onSelectAnime?.(anilistId)}
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left',
+                width: '100%', height: '100%', display: 'block', minHeight: 220,
+              }}
+            >
+              <motion.div
+                className="nv-library-card"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.04 }}
+                whileHover={{ y: -4 }}
+                style={{
+                  position: 'relative', borderRadius: 10, overflow: 'hidden', cursor: 'pointer',
+                  border: '1px solid rgba(200,210,230,0.07)',
+                  background: '#080810', width: '100%', height: '100%', minHeight: 220,
+                }}
+              >
+                {anime.cover_image && (
+                  <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+                    <AnimeCoverImage
+                      src={anime.cover_image}
+                      alt={displayTitle}
+                      fill
+                      style={{ opacity: 0.45 }}
+                    />
+                  </div>
+                )}
+                <div style={{
+                  position: 'absolute', top: 10, left: 10, zIndex: 2,
+                  padding: '3px 8px', borderRadius: 4, background: 'rgba(5,5,8,0.9)',
+                  border: `1px solid ${tagColor}50`, fontSize: 8, fontWeight: 700,
+                  color: tagColor, letterSpacing: '0.1em', fontFamily: "'Space Grotesk', monospace",
+                  textTransform: 'uppercase', backdropFilter: 'blur(6px)',
+                }}>
+                  {POPULARITY_TAG_LABELS[item.popularityTag]}
+                </div>
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 2,
+                  background: 'linear-gradient(to top, rgba(5,5,8,0.98) 0%, rgba(5,5,8,0.7) 50%, transparent 100%)',
+                  padding: '36px 12px 12px',
+                }}>
+                  <h3 style={{
+                    fontSize: 13, fontWeight: 700, color: '#e8eaf6', marginBottom: 4, lineHeight: 1.3,
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                  }}>
+                    {displayTitle}
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {anime.average_score != null && (
+                      <span style={{ fontSize: 11, color: '#0CCEC0', fontWeight: 600 }}>★ {anime.average_score}</span>
+                    )}
+                    {anime.total_episodes != null && (
+                      <span style={{ fontSize: 11, color: 'rgba(200,210,230,0.35)' }}>{anime.total_episodes} ep</span>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </button>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 }
 
@@ -580,17 +877,43 @@ function GridOverlay() {
    MAIN DISCOVER PAGE
    ═══════════════════════════════════════════════════════════════════════════ */
 
+const AUTOCOMPLETE_DEBOUNCE_MS = 250;
+const LIBRARY_GRID_SIZE = 8;
+
+function shuffle<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export default function DiscoverPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [user, setUser] = useState<{ id: string } | null>(null);
+  const [libraryGridItems, setLibraryGridItems] = useState<LibraryGridItem[]>([]);
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [results, setResults] = useState<AnimeResult[] | null>(null);
   const [searchedQuery, setSearchedQuery] = useState('');
   const [error, setError] = useState('');
   const [meta, setMeta] = useState<DiscoverResponse['metadata'] | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [swipeOpen, setSwipeOpen] = useState(false);
+  const [detailAnime, setDetailAnime] = useState<AnimeResult | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+
+  const [suggestions, setSuggestions] = useState<AutocompleteResult[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchBarRef = useRef<HTMLDivElement>(null);
+  const skipAutocompleteOpenRef = useRef(false);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 640);
@@ -599,15 +922,99 @@ export default function DiscoverPage() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  const handleSearch = useCallback(async () => {
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setLibraryGridItems([]);
+      return;
+    }
+    fetch('/api/library/list')
+      .then((res) => res.json())
+      .then((data: { success?: boolean; library?: Array<{ id: number; anime_id: number; anime: LibraryAnimeInfo }> }) => {
+        if (!data.success || !data.library?.length) {
+          setLibraryGridItems([]);
+          return;
+        }
+        const items: LibraryGridItem[] = shuffle(data.library)
+          .slice(0, LIBRARY_GRID_SIZE)
+          .map((item) => ({
+            id: item.id,
+            anime_id: item.anime_id,
+            anime: item.anime,
+            popularityTag: getPopularityTag(item.anime.popularity_rank),
+          }));
+        setLibraryGridItems(items);
+      })
+      .catch(() => setLibraryGridItems([]));
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (searchParams.get('onboarding') === '1' && !hasOnboardingCompleted()) {
+      setOnboardingOpen(true);
+    }
+  }, [searchParams]);
+
+  const handleOnboardingClose = useCallback(() => {
+    setOnboardingOpen(false);
+    if (searchParams.get('onboarding') === '1') {
+      router.replace('/discover');
+    }
+  }, [router, searchParams]);
+
+  useEffect(() => {
     const q = query.trim();
-    if (!q || loading) return;
-    setLoading(true); setError(''); setResults(null); setSearchedQuery(q); setMeta(null);
+    if (q.length < 2) {
+      setSuggestions([]);
+      setSuggestionsOpen(false);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setSuggestionsLoading(true);
+      try {
+        const res = await fetch(`/api/search/autocomplete?q=${encodeURIComponent(q)}&limit=5`);
+        const data = await res.json();
+        setSuggestions(data.results ?? []);
+        if (!skipAutocompleteOpenRef.current) setSuggestionsOpen(true);
+        skipAutocompleteOpenRef.current = false;
+        setHighlightedIndex(-1);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSuggestionsLoading(false);
+      }
+    }, AUTOCOMPLETE_DEBOUNCE_MS);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchBarRef.current && !searchBarRef.current.contains(e.target as Node)) {
+        setSuggestionsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearch = useCallback(async (overrideQuery?: string, anilistId?: number) => {
+    const q = (overrideQuery ?? query).trim();
+    if ((!q && !anilistId) || loading) return;
+    setLoading(true); setError(''); setResults(null); setSearchedQuery(q || (anilistId ? `anilist:${anilistId}` : '')); setMeta(null);
+    setSuggestionsOpen(false);
     try {
       const res = await fetch('/api/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, match_count: 20 }),
+        body: JSON.stringify(anilistId ? { anilist_id: anilistId, match_count: 20 } : { query: q, match_count: 20 }),
       });
       const data: DiscoverResponse = await res.json();
       if (!data.success) { setError(data.error || 'Search failed'); setResults([]); return; }
@@ -621,7 +1028,42 @@ export default function DiscoverPage() {
     finally { setLoading(false); }
   }, [query, loading, isMobile]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleSearch(); };
+  const handleSuggestionSelect = (s: AutocompleteResult) => {
+    skipAutocompleteOpenRef.current = true;
+    setSuggestionsOpen(false);
+    setQuery(s.title_english || s.title);
+    handleSearch(s.title_english || s.title, s.anilist_id);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (suggestionsOpen && suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedIndex((i) => (i < suggestions.length - 1 ? i + 1 : 0));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedIndex((i) => (i > 0 ? i - 1 : suggestions.length - 1));
+        return;
+      }
+      if (e.key === 'Enter' && highlightedIndex >= 0) {
+        e.preventDefault();
+        handleSuggestionSelect(suggestions[highlightedIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setSuggestionsOpen(false);
+        setHighlightedIndex(-1);
+        return;
+      }
+    }
+    if (e.key === 'Enter') {
+      skipAutocompleteOpenRef.current = true;
+      setSuggestionsOpen(false);
+      handleSearch();
+    }
+  };
 
   const hasSearched = results !== null;
   const hasResults = hasSearched && results!.length > 0;
@@ -652,50 +1094,144 @@ export default function DiscoverPage() {
             </p>
           </motion.div>
 
-          {/* Search bar */}
+          {/* Search bar + autocomplete */}
           <motion.div
+            ref={searchBarRef}
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
             className="nv-search-bar"
-            style={{
+            style={{ position: 'relative', marginBottom: 32 }}
+          >
+            <div style={{
               display: 'flex', alignItems: 'center',
               background: 'rgba(255,255,255,0.04)',
               border: `1px solid ${focused ? 'rgba(12,206,192,0.35)' : 'rgba(200,210,230,0.12)'}`,
-              borderRadius: 10, padding: '0 14px', marginBottom: 32,
+              borderRadius: 10, padding: '0 14px',
               transition: 'border-color 0.2s ease',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(200,210,230,0.35)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-            <input
-              type="text" placeholder="Search by title or vibe... (press Enter)"
-              value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={handleKeyDown}
-              onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} disabled={loading}
-              style={{
-                flex: 1, background: 'transparent', border: 'none', outline: 'none',
-                color: '#e8eaf6', fontSize: 14, padding: '13px 12px',
-                fontFamily: "'Inter', sans-serif", caretColor: '#0CCEC0', minWidth: 0,
-                opacity: loading ? 0.5 : 1,
-              }}
-            />
-            <button onClick={handleSearch} disabled={loading || !query.trim()} style={{
-              background: 'none', border: 'none', cursor: loading ? 'wait' : 'pointer',
-              padding: 4, display: 'flex', alignItems: 'center', flexShrink: 0,
-              color: loading ? '#0CCEC0' : query.trim() ? '#0CCEC0' : 'rgba(200,210,230,0.2)',
-              transition: 'color 0.2s',
             }}>
-              {loading ? (
-                <motion.svg animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                </motion.svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(200,210,230,0.35)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search by title or vibe... (press Enter)"
+                aria-label="Search anime by title or vibe"
+                aria-expanded={suggestionsOpen && suggestions.length > 0}
+                aria-autocomplete="list"
+                aria-controls="autocomplete-listbox"
+                aria-activedescendant={suggestionsOpen && highlightedIndex >= 0 ? `suggestion-${highlightedIndex}` : undefined}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                disabled={loading}
+                autoComplete="off"
+                style={{
+                  flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                  color: '#e8eaf6', fontSize: 14, padding: '13px 12px',
+                  fontFamily: "'Inter', sans-serif", caretColor: '#0CCEC0', minWidth: 0,
+                  opacity: loading ? 0.5 : 1,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => handleSearch()}
+                disabled={loading || !query.trim()}
+                aria-label="Search"
+                style={{
+                background: 'none', border: 'none', cursor: loading ? 'wait' : 'pointer',
+                padding: 4, display: 'flex', alignItems: 'center', flexShrink: 0,
+                color: loading ? '#0CCEC0' : query.trim() ? '#0CCEC0' : 'rgba(200,210,230,0.2)',
+                transition: 'color 0.2s',
+              }}>
+                {loading ? (
+                  <motion.svg animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </motion.svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                )}
+              </button>
+            </div>
+
+            {/* Autocomplete dropdown */}
+            <AnimatePresence>
+              {suggestionsOpen && (suggestions.length > 0 || suggestionsLoading) && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                  id="autocomplete-listbox"
+                  role="listbox"
+                  aria-label="Search suggestions"
+                  style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6,
+                    background: 'rgba(8,8,16,0.98)', border: '1px solid rgba(200,210,230,0.12)',
+                    borderRadius: 10, overflow: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                    zIndex: 50, maxHeight: 280, overflowY: 'auto',
+                  }}
+                >
+                  {suggestionsLoading ? (
+                    <div style={{ padding: 24, textAlign: 'center', color: 'rgba(200,210,230,0.4)', fontSize: 13 }}>Searching...</div>
+                  ) : (
+                    suggestions.map((s, i) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        role="option"
+                        id={`suggestion-${i}`}
+                        aria-selected={highlightedIndex === i}
+                        onClick={() => handleSuggestionSelect(s)}
+                        onMouseEnter={() => setHighlightedIndex(i)}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                          background: highlightedIndex === i ? 'rgba(12,206,192,0.08)' : 'transparent',
+                          border: 'none', cursor: 'pointer', textAlign: 'left',
+                          borderBottom: i < suggestions.length - 1 ? '1px solid rgba(200,210,230,0.06)' : 'none',
+                          transition: 'background 0.15s',
+                        }}
+                      >
+                        {s.cover_image && (
+                          <AnimeCoverImage
+                            src={s.cover_image}
+                            alt=""
+                            width={36}
+                            height={50}
+                            style={{ borderRadius: 4, flexShrink: 0 }}
+                          />
+                        )}
+                        {!s.cover_image && (
+                          <div style={{ width: 36, height: 50, background: 'rgba(255,255,255,0.06)', borderRadius: 4, flexShrink: 0 }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#e8eaf6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.title_english || s.title}
+                          </div>
+                          {s.title_english && s.title !== s.title_english && (
+                            <div style={{ fontSize: 11, color: 'rgba(200,210,230,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {s.title}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </motion.div>
               )}
-            </button>
+            </AnimatePresence>
           </motion.div>
+
+          {/* Library grid (logged-in) */}
+          {user && libraryGridItems.length > 0 && (
+            <LibraryGrid
+              items={libraryGridItems}
+              onSelectAnime={(anilistId) => handleSearch(undefined, anilistId)}
+            />
+          )}
 
           {/* Error */}
           {error && (
@@ -739,7 +1275,14 @@ export default function DiscoverPage() {
               </motion.div>
             ) : hasResults ? (
               <motion.div key="results" className="nv-card-grid" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                {results!.map((anime, i) => <AnimeCard key={anime.id} anime={anime} index={i} />)}
+                {results!.map((anime, i) => (
+                  <AnimeCard
+                    key={anime.id}
+                    anime={anime}
+                    index={i}
+                    onClick={() => setDetailAnime(anime)}
+                  />
+                ))}
               </motion.div>
             ) : hasSearched ? (
               <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{
@@ -775,10 +1318,39 @@ export default function DiscoverPage() {
         )}
       </AnimatePresence>
 
+      {/* ─── Detail modal ─── */}
+      <AnimatePresence>
+        {detailAnime && (
+          <AnimeDetailModal
+            key="detail-modal"
+            anime={detailAnime}
+            onClose={() => setDetailAnime(null)}
+            onAddToLibrary={user ? async () => {
+              try {
+                const res = await fetch('/api/library/add', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ anime_id: detailAnime.id, status: 'plan_to_watch' }),
+                });
+                const data = await res.json();
+                if (data.success) setDetailAnime(null);
+              } catch {
+                // ignore
+              }
+            } : undefined}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ─── Onboarding welcome modal ─── */}
+      <OnboardingModal open={onboardingOpen} onClose={handleOnboardingClose} />
+
       {/* ─── Styles ─── */}
       <style>{`
         .nv-discover-container { max-width: 1100px; margin-inline: auto; padding: 48px 40px 80px; }
         .nv-search-bar { max-width: 520px; }
+        .nv-library-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 220px; gap: 16px; }
+        .nv-library-card { height: 100%; min-height: 220px; }
         .nv-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; }
         .nv-card { height: 300px; width: 100%; }
         .nv-tags { display: none; }
@@ -800,6 +1372,8 @@ export default function DiscoverPage() {
         @media (max-width: 640px) {
           .nv-discover-container { padding: 28px 16px 64px; }
           .nv-search-bar { max-width: 100%; margin-bottom: 24px; }
+          .nv-library-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+          .nv-library-card { height: 200px; }
           .nv-card-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
           .nv-card { height: 260px; }
           .nv-tags { display: flex; }

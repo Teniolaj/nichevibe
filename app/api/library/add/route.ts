@@ -1,4 +1,5 @@
 import { rateLimit, rateLimitPresets } from '@/lib/rate-limit';
+import { LibraryAddSchema, parseOr400 } from '@/lib/schemas';
 import { json, requireAuth } from '@/lib/supabase/route-client';
 
 export async function POST(request: Request) {
@@ -11,15 +12,13 @@ export async function POST(request: Request) {
     if (limited) return limited;
 
     const body = await request.json().catch(() => null);
-    if (!body || typeof body.anime_id !== 'number') {
-      return json({ success: false, error: '"anime_id" (number) is required', code: 'INVALID_INPUT' }, 400);
+    if (!body) {
+      return json({ success: false, error: 'Invalid JSON body', code: 'INVALID_INPUT' }, 400);
     }
 
-    const status = body.status || 'plan_to_watch';
-    const validStatuses = ['plan_to_watch', 'watching', 'completed', 'on_hold', 'dropped'];
-    if (!validStatuses.includes(status)) {
-      return json({ success: false, error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`, code: 'INVALID_INPUT' }, 400);
-    }
+    const parsed = parseOr400(LibraryAddSchema, body, json);
+    if (!parsed.success) return parsed.response;
+    const { anime_id, status } = parsed.data;
 
     const now = new Date().toISOString();
     const { data, error } = await supabase
@@ -40,7 +39,7 @@ export async function POST(request: Request) {
           .from('user_library')
           .select('status')
           .eq('user_id', user.id)
-          .eq('anime_id', body.anime_id)
+          .eq('anime_id', anime_id)
           .single();
 
         return json({

@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 
 /* ─── Types ─── */
@@ -213,7 +213,9 @@ function AlertBox({ alert }: { alert: AlertState }) {
 /* ─── Main Login Page ─── */
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+  const redirectTo = searchParams.get('redirectTo');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -257,7 +259,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push('/discover');
+      router.push(redirectTo && /^\/(discover|library|explore)(\/.*)?$/.test(redirectTo) ? redirectTo : '/discover');
       router.refresh();
     } catch {
       setAlert({ type: 'error', message: 'Something went wrong. Please check your connection and try again.' });
@@ -344,10 +346,9 @@ export default function LoginPage() {
           style={{
             position: 'absolute',
             inset: 0,
-            backgroundImage:
-              "url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1920&q=85')",
+            backgroundImage: "url('/Login_Banner.jpg')",
             backgroundSize: 'cover',
-            backgroundPosition: 'center 30%',
+            backgroundPosition: 'center',
           }}
         />
 

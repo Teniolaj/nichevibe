@@ -46,12 +46,14 @@ export async function GET(request: Request) {
           const m = row.metadata as Record<string, unknown> | null;
           animeMap[row.id] = {
             id: row.id,
+            anilist_id: m?.anilist_id ?? row.id,
             title: m?.title ?? 'Unknown',
             title_english: m?.title_english ?? null,
             cover_image: m?.cover_image ?? null,
             total_episodes: m?.total_episodes ?? null,
             genres: m?.genres ?? [],
             average_score: m?.average_score ?? null,
+            popularity_rank: m?.popularity_rank ?? null,
           };
         }
       }

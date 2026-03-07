@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
+import { AnimeCoverImage } from '../components/AnimeCoverImage';
 
 /* ─── Types ─── */
 type Status = 'plan_to_watch' | 'watching' | 'completed' | 'on_hold' | 'dropped';
@@ -66,46 +67,254 @@ const STATUS_LABELS: Record<Status, string> = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   LIBRARY CARD
+   EDIT MODAL
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function LibraryCard({
-  item, onUpdate, onRemove,
+function EditModal({
+  item,
+  onSave,
+  onCancel,
+  onRemove,
 }: {
   item: LibraryItem;
-  onUpdate: (id: number, updates: Record<string, unknown>) => Promise<void>;
-  onRemove: (id: number) => Promise<void>;
+  onSave: (updates: Record<string, unknown>) => Promise<void>;
+  onCancel: () => void;
+  onRemove: () => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [hovered, setHovered] = useState(false);
   const [localStatus, setLocalStatus] = useState(item.status);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
   const [localEp, setLocalEp] = useState(item.current_episode);
   const [localRating, setLocalRating] = useState(item.personal_rating);
   const [localNotes, setLocalNotes] = useState(item.notes || '');
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
 
-  const color = STATUS_COLORS[item.status];
   const anime = item.anime;
   const displayTitle = anime.title_english || anime.title;
   const totalEp = anime.total_episodes;
 
   const handleSave = async () => {
     setSaving(true);
-    await onUpdate(item.id, {
+    await onSave({
       status: localStatus,
       current_episode: localEp,
       personal_rating: localRating,
       notes: localNotes || null,
     });
     setSaving(false);
-    setEditing(false);
+    onCancel();
   };
 
   const handleRemove = async () => {
     setRemoving(true);
-    await onRemove(item.id);
+    await onRemove();
+    setRemoving(false);
+    onCancel();
   };
+
+  return (
+    <motion.div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-modal-title"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: 0.15 } }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 200,
+        background: 'rgba(5,5,8,0.85)',
+        backdropFilter: 'blur(12px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: 400,
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          background: '#0d0d18',
+          borderRadius: 12,
+          border: '1px solid rgba(200,210,230,0.1)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+          padding: 24,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e8eaf6', fontFamily: "'Space Grotesk', sans-serif" }}>
+            Edit: {displayTitle}
+          </h3>
+          <button
+            onClick={onCancel}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+              color: 'rgba(200,210,230,0.5)', fontSize: 18,
+            }}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        <label htmlFor="edit-status" style={{ display: 'block', fontSize: 9, color: 'rgba(200,210,230,0.3)', letterSpacing: '0.12em', fontFamily: "'Space Grotesk', monospace", textTransform: 'uppercase', marginBottom: 4 }}>
+          STATUS
+        </label>
+        <select
+          id="edit-status"
+          value={localStatus}
+          onChange={(e) => setLocalStatus(e.target.value as Status)}
+          style={{
+            width: '100%', padding: '10px 12px', borderRadius: 8, marginBottom: 16,
+            background: 'rgba(5,5,8,0.9)', border: '1px solid rgba(200,210,230,0.12)',
+            color: '#e8eaf6', fontSize: 13, fontFamily: "'Inter', sans-serif",
+            outline: 'none', cursor: 'pointer',
+          }}
+        >
+          {Object.entries(STATUS_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+
+        <label htmlFor="edit-episode" style={{ display: 'block', fontSize: 9, color: 'rgba(200,210,230,0.3)', letterSpacing: '0.12em', fontFamily: "'Space Grotesk', monospace", textTransform: 'uppercase', marginBottom: 4 }}>
+          EPISODE
+        </label>
+        <input
+          id="edit-episode"
+          type="number"
+          min={0}
+          max={totalEp || 9999}
+          value={localEp}
+          onChange={(e) => setLocalEp(Math.max(0, parseInt(e.target.value) || 0))}
+          style={{
+            width: '100%', padding: '10px 12px', borderRadius: 8, marginBottom: 16,
+            background: 'rgba(5,5,8,0.9)', border: '1px solid rgba(200,210,230,0.12)',
+            color: '#e8eaf6', fontSize: 13, fontFamily: "'Inter', sans-serif", outline: 'none',
+          }}
+        />
+
+        <label htmlFor="edit-rating" style={{ display: 'block', fontSize: 9, color: 'rgba(200,210,230,0.3)', letterSpacing: '0.12em', fontFamily: "'Space Grotesk', monospace", textTransform: 'uppercase', marginBottom: 4 }}>
+          RATING (1-10)
+        </label>
+        <input
+          id="edit-rating"
+          type="number"
+          min={1}
+          max={10}
+          value={localRating ?? ''}
+          onChange={(e) => {
+            const v = parseInt(e.target.value);
+            setLocalRating(isNaN(v) ? null : Math.min(10, Math.max(1, v)));
+          }}
+          placeholder="—"
+          style={{
+            width: '100%', padding: '10px 12px', borderRadius: 8, marginBottom: 16,
+            background: 'rgba(5,5,8,0.9)', border: '1px solid rgba(200,210,230,0.12)',
+            color: '#e8eaf6', fontSize: 13, fontFamily: "'Inter', sans-serif", outline: 'none',
+          }}
+        />
+
+        <label htmlFor="edit-notes" style={{ display: 'block', fontSize: 9, color: 'rgba(200,210,230,0.3)', letterSpacing: '0.12em', fontFamily: "'Space Grotesk', monospace", textTransform: 'uppercase', marginBottom: 4 }}>
+          NOTES
+        </label>
+        <textarea
+          id="edit-notes"
+          value={localNotes}
+          onChange={(e) => setLocalNotes(e.target.value)}
+          placeholder="Your thoughts..."
+          rows={3}
+          style={{
+            width: '100%', padding: '10px 12px', borderRadius: 8, marginBottom: 20,
+            background: 'rgba(5,5,8,0.9)', border: '1px solid rgba(200,210,230,0.12)',
+            color: '#e8eaf6', fontSize: 13, fontFamily: "'Inter', sans-serif",
+            outline: 'none', resize: 'vertical',
+          }}
+        />
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            aria-label="Save changes"
+            style={{
+              flex: 1, padding: '12px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: '#0CCEC0', color: '#050508', fontSize: 12, fontWeight: 700,
+              fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em',
+              opacity: saving ? 0.5 : 1,
+            }}
+          >
+            {saving ? 'SAVING...' : 'SAVE'}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Cancel"
+            style={{
+              padding: '12px 20px', borderRadius: 8, border: '1px solid rgba(200,210,230,0.15)',
+              cursor: 'pointer', background: 'transparent', color: 'rgba(200,210,230,0.5)',
+              fontSize: 12, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            type="button"
+            onClick={handleRemove}
+            disabled={removing}
+            aria-label="Remove from library"
+            style={{
+              padding: '12px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.3)',
+              cursor: 'pointer', background: 'rgba(239,68,68,0.1)', color: '#ef4444',
+              fontSize: 12, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
+              opacity: removing ? 0.5 : 1,
+            }}
+          >
+            {removing ? '...' : 'DEL'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIBRARY CARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function LibraryCard({
+  item,
+  onEdit,
+  onUpdate,
+  onRemove,
+}: {
+  item: LibraryItem;
+  onEdit: () => void;
+  onUpdate: (id: number, updates: Record<string, unknown>) => Promise<void>;
+  onRemove: (id: number) => Promise<void>;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const color = STATUS_COLORS[item.status];
+  const anime = item.anime;
+  const displayTitle = anime.title_english || anime.title;
+  const totalEp = anime.total_episodes;
 
   return (
     <motion.div
@@ -125,11 +334,14 @@ function LibraryCard({
       {/* Cover section */}
       <div style={{ position: 'relative', height: 180, background: '#0a0a12' }}>
         {anime.cover_image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={anime.cover_image} alt={displayTitle}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5 }}
-          />
+          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+            <AnimeCoverImage
+              src={anime.cover_image}
+              alt={displayTitle}
+              fill
+              style={{ opacity: 0.5 }}
+            />
+          </div>
         )}
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -169,7 +381,7 @@ function LibraryCard({
           <div style={{ marginBottom: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
               <span style={{ fontSize: 11, color: 'rgba(200,210,230,0.4)', fontFamily: "'Space Grotesk', monospace" }}>
-                Episode {localEp}{totalEp ? ` / ${totalEp}` : ''}
+                Episode {item.current_episode}{totalEp ? ` / ${totalEp}` : ''}
               </span>
               {item.personal_rating && (
                 <span style={{ fontSize: 11, color: '#0CCEC0', fontWeight: 600 }}>
@@ -181,7 +393,7 @@ function LibraryCard({
               <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
                 <div style={{
                   height: '100%', borderRadius: 2, background: color,
-                  width: `${Math.min((localEp / totalEp) * 100, 100)}%`,
+                  width: `${Math.min((item.current_episode / totalEp) * 100, 100)}%`,
                   transition: 'width 0.3s ease',
                 }} />
               </div>
@@ -190,148 +402,43 @@ function LibraryCard({
         )}
 
         {/* Quick actions */}
-        {!editing ? (
-          <div style={{ display: 'flex', gap: 6 }}>
-            {item.status === 'watching' && totalEp && localEp < totalEp && (
-              <button
-                onClick={() => {
-                  const next = localEp + 1;
-                  setLocalEp(next);
-                  onUpdate(item.id, { current_episode: next });
-                }}
-                style={{
-                  flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
-                  background: `${color}15`, color, fontSize: 11, fontWeight: 700,
-                  fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em',
-                  transition: 'background 0.2s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = `${color}25`; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = `${color}15`; }}
-              >
-                + EP
-              </button>
-            )}
+        <div style={{ display: 'flex', gap: 6 }}>
+          {item.status === 'watching' && totalEp && item.current_episode < totalEp && (
             <button
-              onClick={() => setEditing(true)}
-              style={{
-                flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid rgba(200,210,230,0.08)',
-                cursor: 'pointer', background: 'transparent', color: 'rgba(200,210,230,0.4)',
-                fontSize: 11, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
-                transition: 'color 0.2s, border-color 0.2s',
+              type="button"
+              aria-label="Increment episode"
+              onClick={() => {
+                const next = item.current_episode + 1;
+                onUpdate(item.id, { current_episode: next });
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#e8eaf6'; e.currentTarget.style.borderColor = 'rgba(200,210,230,0.2)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(200,210,230,0.4)'; e.currentTarget.style.borderColor = 'rgba(200,210,230,0.08)'; }}
+              style={{
+                flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
+                background: `${color}15`, color, fontSize: 11, fontWeight: 700,
+                fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = `${color}25`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = `${color}15`; }}
             >
-              EDIT
+              + EP
             </button>
-          </div>
-        ) : (
-          /* ─── Edit panel ─── */
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ overflow: 'hidden' }}>
-            {/* Status */}
-            <label style={{ display: 'block', fontSize: 9, color: 'rgba(200,210,230,0.3)', letterSpacing: '0.12em', fontFamily: "'Space Grotesk', monospace", textTransform: 'uppercase', marginBottom: 4 }}>
-              STATUS
-            </label>
-            <select
-              value={localStatus}
-              onChange={(e) => setLocalStatus(e.target.value as Status)}
-              style={{
-                width: '100%', padding: '7px 10px', borderRadius: 6, marginBottom: 10,
-                background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(200,210,230,0.1)',
-                color: '#e8eaf6', fontSize: 12, fontFamily: "'Inter', sans-serif",
-                outline: 'none', cursor: 'pointer',
-              }}
-            >
-              {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
-
-            {/* Episode */}
-            <label style={{ display: 'block', fontSize: 9, color: 'rgba(200,210,230,0.3)', letterSpacing: '0.12em', fontFamily: "'Space Grotesk', monospace", textTransform: 'uppercase', marginBottom: 4 }}>
-              EPISODE
-            </label>
-            <input
-              type="number" min={0} max={totalEp || 9999} value={localEp}
-              onChange={(e) => setLocalEp(Math.max(0, parseInt(e.target.value) || 0))}
-              style={{
-                width: '100%', padding: '7px 10px', borderRadius: 6, marginBottom: 10,
-                background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(200,210,230,0.1)',
-                color: '#e8eaf6', fontSize: 12, fontFamily: "'Inter', sans-serif", outline: 'none',
-              }}
-            />
-
-            {/* Rating */}
-            <label style={{ display: 'block', fontSize: 9, color: 'rgba(200,210,230,0.3)', letterSpacing: '0.12em', fontFamily: "'Space Grotesk', monospace", textTransform: 'uppercase', marginBottom: 4 }}>
-              RATING (1-10)
-            </label>
-            <input
-              type="number" min={1} max={10} value={localRating ?? ''}
-              onChange={(e) => {
-                const v = parseInt(e.target.value);
-                setLocalRating(isNaN(v) ? null : Math.min(10, Math.max(1, v)));
-              }}
-              placeholder="—"
-              style={{
-                width: '100%', padding: '7px 10px', borderRadius: 6, marginBottom: 10,
-                background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(200,210,230,0.1)',
-                color: '#e8eaf6', fontSize: 12, fontFamily: "'Inter', sans-serif", outline: 'none',
-              }}
-            />
-
-            {/* Notes */}
-            <label style={{ display: 'block', fontSize: 9, color: 'rgba(200,210,230,0.3)', letterSpacing: '0.12em', fontFamily: "'Space Grotesk', monospace", textTransform: 'uppercase', marginBottom: 4 }}>
-              NOTES
-            </label>
-            <textarea
-              value={localNotes}
-              onChange={(e) => setLocalNotes(e.target.value)}
-              placeholder="Your thoughts..."
-              rows={2}
-              style={{
-                width: '100%', padding: '7px 10px', borderRadius: 6, marginBottom: 12,
-                background: 'rgba(5,5,8,0.8)', border: '1px solid rgba(200,210,230,0.1)',
-                color: '#e8eaf6', fontSize: 12, fontFamily: "'Inter', sans-serif",
-                outline: 'none', resize: 'vertical',
-              }}
-            />
-
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                onClick={handleSave} disabled={saving}
-                style={{
-                  flex: 1, padding: '7px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
-                  background: '#0CCEC0', color: '#050508', fontSize: 11, fontWeight: 700,
-                  fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em',
-                  opacity: saving ? 0.5 : 1,
-                }}
-              >
-                {saving ? 'SAVING...' : 'SAVE'}
-              </button>
-              <button
-                onClick={() => setEditing(false)}
-                style={{
-                  padding: '7px 12px', borderRadius: 6, border: '1px solid rgba(200,210,230,0.1)',
-                  cursor: 'pointer', background: 'transparent', color: 'rgba(200,210,230,0.4)',
-                  fontSize: 11, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
-                }}
-              >
-                ✕
-              </button>
-              <button
-                onClick={handleRemove} disabled={removing}
-                style={{
-                  padding: '7px 12px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)',
-                  cursor: 'pointer', background: 'rgba(239,68,68,0.08)', color: '#ef4444',
-                  fontSize: 11, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
-                  opacity: removing ? 0.5 : 1,
-                }}
-              >
-                {removing ? '...' : 'DEL'}
-              </button>
-            </div>
-          </motion.div>
-        )}
+          )}
+          <button
+            type="button"
+            aria-label="Edit"
+            onClick={onEdit}
+            style={{
+              flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid rgba(200,210,230,0.08)',
+              cursor: 'pointer', background: 'transparent', color: 'rgba(200,210,230,0.4)',
+              fontSize: 11, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
+              transition: 'color 0.2s, border-color 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#e8eaf6'; e.currentTarget.style.borderColor = 'rgba(200,210,230,0.2)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(200,210,230,0.4)'; e.currentTarget.style.borderColor = 'rgba(200,210,230,0.08)'; }}
+          >
+            EDIT
+          </button>
+        </div>
       </div>
     </motion.div>
   );
@@ -345,6 +452,7 @@ export default function LibraryPage() {
   const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [stats, setStats] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState<Status | 'all'>('all');
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -354,7 +462,6 @@ export default function LibraryPage() {
       const data: LibraryResponse = await res.json();
       if (data.success) {
         setLibrary(data.library);
-        setStats(data.stats);
         setError('');
       } else {
         setError(data.error || 'Failed to load library');
@@ -368,13 +475,33 @@ export default function LibraryPage() {
 
   useEffect(() => { fetchLibrary(); }, [fetchLibrary]);
 
+  useEffect(() => {
+    setStats({
+      total_items: library.length,
+      watching: library.filter((i) => i.status === 'watching').length,
+      completed: library.filter((i) => i.status === 'completed').length,
+      plan_to_watch: library.filter((i) => i.status === 'plan_to_watch').length,
+      on_hold: library.filter((i) => i.status === 'on_hold').length,
+      dropped: library.filter((i) => i.status === 'dropped').length,
+    });
+  }, [library]);
+
   const handleUpdate = async (id: number, updates: Record<string, unknown>) => {
-    await fetch('/api/library/update', {
+    const res = await fetch('/api/library/update', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ library_item_id: id, ...updates }),
     });
-    fetchLibrary();
+    const data = await res.json();
+    if (data.success && data.updated_item) {
+      setLibrary((prev) =>
+        prev.map((i) =>
+          i.id === id ? { ...i, ...data.updated_item, anime: i.anime } : i
+        )
+      );
+    } else {
+      await fetchLibrary();
+    }
   };
 
   const handleRemove = async (id: number) => {
@@ -419,6 +546,8 @@ export default function LibraryPage() {
 
           {/* Tabs */}
           <motion.div
+            role="tablist"
+            aria-label="Library status filters"
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
             className="nv-lib-tabs"
@@ -428,6 +557,9 @@ export default function LibraryPage() {
               return (
                 <button
                   key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   style={{
                     padding: '8px 16px', border: 'none', borderRadius: 8, cursor: 'pointer',
@@ -483,7 +615,13 @@ export default function LibraryPage() {
             <motion.div className="nv-lib-grid" layout>
               <AnimatePresence>
                 {filtered.map((item) => (
-                  <LibraryCard key={item.id} item={item} onUpdate={handleUpdate} onRemove={handleRemove} />
+                  <LibraryCard
+                    key={item.id}
+                    item={item}
+                    onEdit={() => setEditingItemId(item.id)}
+                    onUpdate={handleUpdate}
+                    onRemove={handleRemove}
+                  />
                 ))}
               </AnimatePresence>
             </motion.div>
@@ -503,6 +641,23 @@ export default function LibraryPage() {
           )}
         </div>
       </div>
+
+      {/* Edit modal */}
+      <AnimatePresence>
+        {editingItemId && (() => {
+          const item = library.find((i) => i.id === editingItemId);
+          if (!item) return null;
+          return (
+            <EditModal
+              key={editingItemId}
+              item={item}
+              onSave={async (updates) => handleUpdate(item.id, updates)}
+              onCancel={() => setEditingItemId(null)}
+              onRemove={async () => handleRemove(item.id)}
+            />
+          );
+        })()}
+      </AnimatePresence>
 
       <style>{`
         .nv-lib-container { max-width: 1100px; margin-inline: auto; padding: 48px 40px 80px; }

@@ -31,6 +31,6 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code)
   }
 
-  // Redirect to discover page after successful auth
-  return NextResponse.redirect(new URL('/discover', request.url))
+  // Redirect to discover page with onboarding flag for welcome modal
+  return NextResponse.redirect(new URL('/discover?onboarding=1', request.url))
 }

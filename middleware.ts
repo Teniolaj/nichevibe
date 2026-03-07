@@ -39,7 +39,7 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getSession();
 
   // ── Protected routes — must be signed in ──────────────────────────────────
-  const protectedPaths = ['/discover', '/library'];
+  const protectedPaths = ['/discover', '/library', '/explore'];
   const isProtected = protectedPaths.some((path) =>
     req.nextUrl.pathname.startsWith(path),
   );
@@ -67,6 +67,7 @@ export const config = {
   matcher: [
     '/discover/:path*',
     '/library/:path*',
+    '/explore/:path*',
     '/login',
     '/signup',
   ],
