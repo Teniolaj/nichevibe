@@ -147,9 +147,28 @@ function UserDropdown({
         <DropdownLink href="/library" onClick={onClose}>
           MY LIBRARY
         </DropdownLink>
-        <DropdownLink href="/settings" onClick={onClose}>
+        <div
+          title="Coming soon..."
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 12px',
+            borderRadius: 4,
+            fontSize: 13,
+            color: 'rgba(200,210,230,0.3)',
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 500,
+            letterSpacing: '0.02em',
+            cursor: 'not-allowed',
+            userSelect: 'none',
+          }}
+        >
           SETTINGS
-        </DropdownLink>
+          <span style={{ fontSize: 10, color: 'rgba(200,210,230,0.25)', fontStyle: 'italic' }}>
+            Coming soon...
+          </span>
+        </div>
       </div>
 
       <Divider />
