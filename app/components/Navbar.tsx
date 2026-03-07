@@ -248,6 +248,8 @@ export default function Navbar({ active }: { active?: 'discover' | 'explore' | '
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [avatarHighlighted, setAvatarHighlighted] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [signedInToast, setSignedInToast] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -256,16 +258,28 @@ export default function Navbar({ active }: { active?: 'discover' | 'explore' | '
     const supabase = createClient();
 
     // Hydrate immediately from existing session
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
-
-    // React to sign-in / sign-out events in real time
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      setAuthLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // React to sign-in / sign-out events in real time
+    let toastTimer: ReturnType<typeof setTimeout> | null = null;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+      if (event === 'SIGNED_IN' && session?.user) {
+        setSignedInToast(true);
+        toastTimer = setTimeout(() => setSignedInToast(false), 2200);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      if (toastTimer) clearTimeout(toastTimer);
+    };
   }, []); // runs once on mount; createClient() returns a stable singleton
 
   /* ── Close dropdown when clicking outside ── */
@@ -293,11 +307,11 @@ export default function Navbar({ active }: { active?: 'discover' | 'explore' | '
   /* ── Sign out ── */
   const handleSignOut = async () => {
     setSigningOut(true);
+    setDropdownOpen(false);
+    setMenuOpen(false);
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-      setDropdownOpen(false);
-      setMenuOpen(false);
       router.push('/');
       router.refresh();
     } catch (err) {
@@ -309,6 +323,90 @@ export default function Navbar({ active }: { active?: 'discover' | 'explore' | '
 
   return (
     <>
+      {/* ═══════════════════════════════════════
+          SIGNED-IN TOAST — brief feedback when returning from OAuth
+      ═══════════════════════════════════════ */}
+      <AnimatePresence>
+        {signedInToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              position: 'fixed',
+              bottom: 32,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 9998,
+              padding: '12px 24px',
+              borderRadius: 10,
+              background: 'rgba(12,206,192,0.12)',
+              border: '1px solid rgba(12,206,192,0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            }}
+          >
+            <span style={{ fontSize: 18 }}>✓</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#0CCEC0', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.04em' }}>
+              Signed in
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══════════════════════════════════════
+          SIGN-OUT OVERLAY — full-screen app-like transition
+      ═══════════════════════════════════════ */}
+      <AnimatePresence>
+        {signingOut && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              background: 'rgba(5,5,8,0.96)',
+              backdropFilter: 'blur(12px)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 20,
+            }}
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                border: '3px solid rgba(12,206,192,0.2)',
+                borderTopColor: '#0CCEC0',
+              }}
+            />
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'rgba(200,210,230,0.7)',
+                letterSpacing: '0.12em',
+                fontFamily: "'Space Grotesk', sans-serif",
+                textTransform: 'uppercase',
+              }}
+            >
+              Signing out...
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ═══════════════════════════════════════
           DESKTOP / TABLET NAVBAR
       ═══════════════════════════════════════ */}
@@ -333,7 +431,7 @@ export default function Navbar({ active }: { active?: 'discover' | 'explore' | '
         }}
       >
         {/* Logo */}
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+        <Link href="/" aria-label="NicheVibe home" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
           <div
             style={{
               width: 28,
@@ -395,13 +493,38 @@ export default function Navbar({ active }: { active?: 'discover' | 'explore' | '
           })}
         </div>
 
-        {/* Right side — sign up OR user menu */}
+        {/* Right side — loading, sign up, OR user menu */}
         <div
           ref={dropdownRef}
           className="hidden-mobile"
-          style={{ position: 'relative', display: 'flex', alignItems: 'center' }}
+          style={{ position: 'relative', display: 'flex', alignItems: 'center', minWidth: 100, justifyContent: 'flex-end' }}
         >
-          {user ? (
+          {authLoading ? (
+            /* ─── Auth loading ─── */
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(12,206,192,0.2)',
+                  borderTopColor: '#0CCEC0',
+                }}
+              />
+            </div>
+          ) : user ? (
             /* ─── Authenticated ─── */
             <>
               <button
@@ -637,13 +760,41 @@ export default function Navbar({ active }: { active?: 'discover' | 'explore' | '
               })}
             </nav>
 
-            {/* Bottom CTA — sign up (guest) OR sign out (authenticated) */}
+            {/* Bottom CTA — loading, sign up (guest), OR sign out (authenticated) */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.35, duration: 0.3 }}
             >
-              {user ? (
+              {authLoading ? (
+                <div
+                  style={{
+                    padding: '14px 48px',
+                    borderRadius: 10,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(200,210,230,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 10,
+                  }}
+                >
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: '50%',
+                      border: '2px solid rgba(12,206,192,0.2)',
+                      borderTopColor: '#0CCEC0',
+                    }}
+                  />
+                  <span style={{ fontSize: 13, color: 'rgba(200,210,230,0.4)', fontFamily: "'Space Grotesk', sans-serif" }}>
+                    Loading...
+                  </span>
+                </div>
+              ) : user ? (
                 <button
                   onClick={handleSignOut}
                   disabled={signingOut}

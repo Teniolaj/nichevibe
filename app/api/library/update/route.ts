@@ -1,4 +1,5 @@
 import { rateLimit, rateLimitPresets } from '@/lib/rate-limit';
+import { LibraryUpdateSchema, parseOr400 } from '@/lib/schemas';
 import { json, requireAuth } from '@/lib/supabase/route-client';
 
 export async function PATCH(request: Request) {
@@ -11,37 +12,32 @@ export async function PATCH(request: Request) {
     if (limited) return limited;
 
     const body = await request.json().catch(() => null);
-    if (!body || typeof body.library_item_id !== 'number') {
-      return json({ success: false, error: '"library_item_id" (number) is required', code: 'INVALID_INPUT' }, 400);
+    if (!body) {
+      return json({ success: false, error: 'Invalid JSON body', code: 'INVALID_INPUT' }, 400);
     }
 
-    const validStatuses = ['plan_to_watch', 'watching', 'completed', 'on_hold', 'dropped'];
-    if (body.status && !validStatuses.includes(body.status)) {
-      return json({ success: false, error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`, code: 'INVALID_INPUT' }, 400);
-    }
-
-    if (body.personal_rating !== undefined && (body.personal_rating < 1 || body.personal_rating > 10)) {
-      return json({ success: false, error: 'Rating must be between 1 and 10', code: 'INVALID_INPUT' }, 400);
-    }
+    const parsed = parseOr400(LibraryUpdateSchema, body, json);
+    if (!parsed.success) return parsed.response;
+    const { library_item_id, status, current_episode, personal_rating, notes, is_favorite } = parsed.data;
 
     const now = new Date().toISOString();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: Record<string, any> = { last_updated: now };
 
-    if (body.status) {
-      updates.status = body.status;
-      if (body.status === 'watching') updates.started_at = now;
-      if (body.status === 'completed') updates.completed_at = now;
+    if (status) {
+      updates.status = status;
+      if (status === 'watching') updates.started_at = now;
+      if (status === 'completed') updates.completed_at = now;
     }
-    if (body.current_episode !== undefined) updates.current_episode = body.current_episode;
-    if (body.personal_rating !== undefined) updates.personal_rating = body.personal_rating;
-    if (body.notes !== undefined) updates.notes = body.notes;
-    if (body.is_favorite !== undefined) updates.is_favorite = body.is_favorite;
+    if (current_episode !== undefined) updates.current_episode = current_episode;
+    if (personal_rating !== undefined) updates.personal_rating = personal_rating;
+    if (notes !== undefined) updates.notes = notes;
+    if (is_favorite !== undefined) updates.is_favorite = is_favorite;
 
     const { data, error } = await supabase
       .from('user_library')
       .update(updates)
-      .eq('id', body.library_item_id)
+      .eq('id', library_item_id)
       .eq('user_id', user.id)
       .select()
       .single();

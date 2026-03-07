@@ -348,8 +348,8 @@ export default function SignupPage() {
         {/* Background image */}
         <div style={{
           position: 'absolute', inset: 0,
-          backgroundImage: "url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1920&q=85')",
-          backgroundSize: 'cover', backgroundPosition: 'center 30%',
+          backgroundImage: "url('/signup_banner.webp')",
+          backgroundSize: 'cover', backgroundPosition: 'center',
         }} />
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(5,5,8,0.38)' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(105deg, rgba(5,5,8,0.05) 0%, rgba(5,5,8,0.25) 55%, rgba(5,5,8,0.92) 100%)' }} />
