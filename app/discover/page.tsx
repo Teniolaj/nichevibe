@@ -2,7 +2,7 @@
 
 import { OnboardingModal, hasOnboardingCompleted } from '../components/OnboardingModal';
 import { AnimatePresence, motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import { AnimeCoverImage } from '../components/AnimeCoverImage';
@@ -889,7 +889,7 @@ function shuffle<T>(arr: T[]): T[] {
   return out;
 }
 
-export default function DiscoverPage() {
+function DiscoverContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<{ id: string } | null>(null);
@@ -1386,5 +1386,29 @@ export default function DiscoverPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function DiscoverPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ background: '#050508', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              border: '3px solid rgba(12,206,192,0.2)',
+              borderTopColor: '#0CCEC0',
+            }}
+          />
+        </div>
+      }
+    >
+      <DiscoverContent />
+    </Suspense>
   );
 }
