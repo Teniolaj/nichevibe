@@ -28,8 +28,8 @@ export interface RateLimitConfig {
 }
 
 const PRESETS = {
-  /** Expensive endpoints — embedding generation, similarity search. */
-  expensive: { limit: 15, windowMs: 60_000 } as RateLimitConfig,
+  /** Expensive endpoints — embedding generation, similarity search (Google AI). */
+  expensive: { limit: 3, windowMs: 300_000 } as RateLimitConfig, // 3 requests per 5 minutes
   /** Standard write operations — add, update, remove. */
   write: { limit: 30, windowMs: 60_000 } as RateLimitConfig,
   /** Read-heavy endpoints — library list. */
