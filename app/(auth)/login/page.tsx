@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { type FormEvent, useState } from 'react';
+import { Suspense, type FormEvent, useState } from 'react';
 
 /* ─── Types ─── */
 type AlertType = 'error' | 'success';
@@ -210,8 +210,8 @@ function AlertBox({ alert }: { alert: AlertState }) {
   );
 }
 
-/* ─── Main Login Page ─── */
-export default function LoginPage() {
+/* ─── Login form (uses useSearchParams, must be in Suspense) ─── */
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -712,5 +712,30 @@ export default function LoginPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+/* ─── Page wrapper with Suspense (required for useSearchParams) ─── */
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ display: 'flex', height: '100vh', background: '#050508', alignItems: 'center', justifyContent: 'center' }}>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              border: '3px solid rgba(12,206,192,0.2)',
+              borderTopColor: '#0CCEC0',
+            }}
+          />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
